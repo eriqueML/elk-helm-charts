@@ -1,0 +1,111 @@
+
+replicaCount: 3
+minimumMasterNodes: 2
+
+clusterName: "elasticsearch"
+
+################################ IMAGE properties #################################
+
+image:
+  repository: "elastic/elasticsearch"
+  tag: "7.8.0"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+###################################################################################
+
+roles:
+  master: "true"
+  ingest: "true"
+  data: "true"
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+podManagementPolicy: "Parallel"
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  httpPortName: http
+  transportPortName: transport
+
+httpPort: 9200
+transportPort: 9300
+nodePort: ""
+
+networkHost: "0.0.0.0"
+
+esJavaOpts: "-Xmx1g -Xms1g"
+updateStrategy: RollingUpdate
+
+
+################################# PV and PVC options ###################################
+
+persistentVolume:
+  name: kb-erik-volume
+  capacity: 10Gi
+  type: local
+  accessModes: ReadWriteMany
+  mountOptions: hard
+  ReclaimPolicy: Delete
+  hostPath: /tmp/eriktest/data
+  
+persistentVolumeClaim:
+  name: elasticsearch-data
+  namespace: kb-erik
+  accessModes: ReadWriteMany
+  storage: 10Gi
+  volumeName: kb-erik-volume
+
+#################################### INGRESS options ###################################
+
+ingress:
+  enabled: false
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths: []
+
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
