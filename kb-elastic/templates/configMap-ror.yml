@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "rorConfigMapName" . }}
+data:
+  readonlyrest.yml: |-
+    readonlyrest:
+      ssl:
+        enable: true
+        keystore_file: "rorkeystore.jks"
+        keystore_pass: rorpass123!
+        key_pass: rorpass123!
+      
+      response_if_req_forbidden: Forbidden by ReadonlyREST!
+      audit_collector: false
+
+      access_control_rules:
+        - name: "kibana"
+          auth_key_sha256: "ab8aa94dd63debfa31ef8a9eae9582dcb252c06cdb6313e123546cc8edfeaf3e"
+          type: allow
+        - name: "kibana_system"
+          auth_key_sha256: "40584f5be57fa50a808018d8f3f9db21ce8c4d298950c31ada4660c5e125dc15"
+          type: allow
+        - name: "elastic"
+          auth_key_sha256: "0fa88a7dc7913397c00dd2c7683fac2f7b3cc3b94d26c7e089f26ecbcdabf316"
+          type: allow
+        - name: "admin"
+          auth_key_sha256: "8da193366e1554c08b2870c50f737b9587c3372b656151c4a96028af26f51334"
+          type: allow
+          kibana_access: unrestricted
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "rorKeystoreConfigMapName" . }}
+binaryData: 
+  rorkeystore.jks: {{ .Files.Get "files/jks/rorkeystore.jks" | b64enc }} 

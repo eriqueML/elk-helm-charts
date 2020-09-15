@@ -1,7 +1,8 @@
+{{- if .Values.persistentVolume.created }}
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: {{ .Values.persistentVolume.name }}
+  name: {{ include "persistentVolumeName" . }}
   labels:
     type: {{ .Values.persistentVolume.type }}
 spec:
@@ -9,9 +10,7 @@ spec:
     storage: {{ .Values.persistentVolume.capacity }}
   accessModes:
     - {{ .Values.persistentVolume.accessModes }}
-  #storageClassName: hostpath
-  mountOptions:
-    - {{ .Values.persistentVolume.mountOptions }}
   persistentVolumeReclaimPolicy: {{ .Values.persistentVolume.ReclaimPolicy }}
   hostPath:
-    path: {{ .Values.persistentVolume.hostPath }}
+    path: {{ .Values.persistentVolume.hostPath.path }}
+{{- end }}

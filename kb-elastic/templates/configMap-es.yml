@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "esConfigMapName" . }}
+data:
+  elasticsearch.yml: |-
+    http.type: ssl_netty4
+    xpack.security.enabled: false

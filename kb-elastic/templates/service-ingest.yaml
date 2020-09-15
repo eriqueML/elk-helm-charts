@@ -1,0 +1,23 @@
+{{- if .Values.ingest.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ingestServiceName" . }}
+  labels:
+    app: {{ include "ingestServiceName" . }}
+spec:
+  type: {{ .Values.ingest.service.type }}
+  ports:
+    - name: {{ .Values.ingest.service.httpPortName | default "http" }}
+      protocol: TCP
+      port: {{ .Values.ingest.service.httpPort }}
+      {{- if .Values.ingest.service.nodePort }}
+      nodePort: {{ .Values.ingest.service.nodePort }}
+      {{- end }}
+    - name: {{ .Values.ingest.service.transportPortName | default "transport" }}
+      protocol: TCP
+      port: {{ .Values.ingest.service.transportPort }}
+    
+  selector:
+    app: {{ include "ingestServiceName" . }}
+{{- end }}

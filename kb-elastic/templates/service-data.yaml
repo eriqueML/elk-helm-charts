@@ -1,0 +1,23 @@
+{{- if .Values.data.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "dataServiceName" . }}
+  labels:
+    app: {{ include "dataServiceName" . }}
+spec:
+  type: {{ .Values.data.service.type }}
+  ports:
+    - name: {{ .Values.data.service.httpPortName | default "http" }}
+      protocol: TCP
+      port: {{ .Values.data.service.httpPort }}
+      {{- if .Values.data.service.nodePort }}
+      nodePort: {{ .Values.data.service.nodePort }}
+      {{- end }}
+    - name: {{ .Values.data.service.transportPortName | default "transport" }}
+      protocol: TCP
+      port: {{ .Values.data.service.transportPort }}
+    
+  selector:
+    app: {{ include "dataServiceName" . }}
+{{- end }}

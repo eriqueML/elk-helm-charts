@@ -1,50 +1,95 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: kibana
+  name: {{ include "kibanaDeploymentName" . }}
   labels:
-    app: kibana
+    app: {{ include "kibanaDeploymentName" . }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app: kibana
+      app: {{ include "kibanaServiceName" . }}
   template:
     metadata:
       labels:
-        app: kibana
+        app: {{ include "kibanaDeploymentName" . }}
     spec:
-    {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-    {{- end }}
-      serviceAccountName: {{ template "kb-kibana.serviceAccountName" . }}
+      serviceAccountName: {{ include "kibanaServiceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       volumes:
-        - name: kb-erik-kibana-volume
+        - name: {{ include "persistentVolumeName" . }}
           persistentVolumeClaim:
-            claimName: kb-erik-kibana-pvc
+            claimName: {{ include "persistentVolumeClaimName" . }}
+        - name: kibana-config
+          configMap:
+            name: {{ include "kibanaConfigMapName" . }}
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          volumeMounts:
+            - name: kibana-config
+              mountPath: /usr/share/kibana/config/kibana.yml
+              readOnly: true
+              subPath: kibana.yml
+            - name: {{ include "persistentVolumeName" . }}
+              mountPath: {{ .Values.volumeMounts.pv.mountPath }} 
           resources:
-            limits:
-              cpu: 1000m
-            requests:
-              cpu: 500m
+{{ toYaml .Values.resources | indent 10 }}
           ports:
             - name: http
-              containerPort: 5601
+              containerPort: {{ .Values.service.targetPort }}
               protocol: TCP
           env:
-            - name: ELASTICSEARCH_URL
-              value: http://elasticsearch:9200
-          resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            - name: PATH_DATA
+              value: "{{ .Values.volumeMounts.pv.mountPath }}"
+            - name: SERVER_NAME
+              value: "{{ .Values.deployment.server_name }}"
+            - name: SERVER_HOST
+              value: "{{ .Values.deployment.server_host }}"
+            - name: SERVER_PORT
+              value: "{{ .Values.deployment.server_port }}"
+#            - name: SERVER_BASEPATH
+#              value: "/app/kibana"
+            - name: ELASTICSEARCH_HOSTS
+              value: "https://{{ include "elasticsearchUrl" . }}:9200"
+            - name: ELASTICSEARCH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kibanaCredentialsName" . }}
+                  key: username
+            - name: ELASTICSEARCH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kibanaCredentialsName" . }}
+                  key: password
+            - name: ELASTICSEARCH_SSL_VERIFICATIONMODE
+              value: "{{ .Values.deployment.es_ssl_verificationmode }}"
+          {{- if .Values.livenessProbe.enabled }}
+          livenessProbe:
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.livenessProbe.successThreshold }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+            httpGet:
+              path: {{ .Values.livenessProbe.httpGet.path }}
+              port: {{ .Values.livenessProbe.httpGet.port }}
+          {{- end }}
+          {{- if .Values.readinessProbe.enabled }}
+          readinessProbe:
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.readinessProbe.successThreshold }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+            httpGet:
+              path: {{ .Values.readinessProbe.httpGet.path }}
+              port: {{ .Values.readinessProbe.httpGet.port }}
+          {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

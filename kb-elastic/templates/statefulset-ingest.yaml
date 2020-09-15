@@ -1,0 +1,141 @@
+---
+{{- if .Values.ingest.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "ingestStatefulSetName" . }}
+spec:
+  serviceName: {{ include "ingestServiceName" . }}
+  selector:
+    matchLabels:
+      app: {{ include "ingestStatefulSetName" . }}
+  replicas: {{ .Values.ingest.replicaCount }}
+  podManagementPolicy: {{ .Values.podManagementPolicy }}
+  updateStrategy:
+    type: {{ .Values.updateStrategy }}
+{{- if not .Values.persistentVolumeClaim.created }}
+  volumeClaimTemplates:
+    - metadata:
+        name: {{ .Values.volumeClaimTemplates.name }}
+      spec:
+        accessModes:
+          - {{ .Values.volumeClaimTemplates.accessModes }}
+        resources:
+          requests:
+            storage: {{ .Values.volumeClaimTemplates.resources.storage }}
+          {{- if .Values.persistentVolume.created }}
+          selector:
+            matchLabels:
+              volume: {{ include "persistentVolumeName" . }}
+          {{- end }}
+{{- end }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "ingestServiceName" . }}
+    spec:
+      volumes:
+        - name: elasticsearch-config
+          configMap:
+            name: {{ include "esConfigMapName" . }}
+        - name: readonlyrest-config
+          configMap:
+            name: {{ include "rorConfigMapName" . }}
+        - name: ror-keystore
+          configMap:
+            name: {{ include "rorKeystoreConfigMapName" . }}
+{{- if .Values.persistentVolumeClaim.created }}
+        - name: {{ include "persistentVolumeName" . }}
+          persistentVolumeClaim:
+            claimName: {{ include "persistentVolumeClaimName" . }}
+{{- end }}
+      containers:
+        - name: elasticsearch
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+          volumeMounts:
+            - name: elasticsearch-config
+              mountPath: /usr/share/elasticsearch/config/elasticsearch.yml
+              readOnly: true
+              subPath: elasticsearch.yml
+            - name: readonlyrest-config
+              mountPath: /usr/share/elasticsearch/config/readonlyrest.yml
+              readOnly: true
+              subPath: readonlyrest.yml
+            - name: ror-keystore
+              mountPath: /usr/share/elasticsearch/config/rorkeystore.jks
+              readOnly: true
+              subPath: rorkeystore.jks
+            - name: {{ include "persistentVolumeName" . }}
+              mountPath: {{ .Values.volumeMounts.pv.mountPath }}
+          {{- if .Values.ingest.resources }}
+          resources: {{- toYaml .Values.ingest.resources | nindent 12 }}
+          {{- end }}
+          securityContext: {{- toYaml .Values.ingest.securityContext | nindent 12 }}
+          env:
+            - name: node.master
+              value: "false"
+            - name: node.data
+              value: "false"
+            - name: node.ingest
+              value: "true"
+            - name: network.host
+              value: "{{ .Values.networkHost }}"
+            - name: cluster.name
+              value: "{{ .Values.clusterName }}"
+            - name: node.name
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: discovery.seed_hosts
+              value: "{{ template "kb-elastic.discoverySeedHosts" . }}"
+            - name: node.max_local_storage_nodes
+              value: {{ add .Values.master.replicaCount .Values.data.replicaCount .Values.ingest.replicaCount | quote }}
+            - name: ELASTICSEARCH_HEAP_SIZE
+              value: {{ .Values.ingest.heapSize | quote }}
+            - name: ELASTICSEARCH_IS_DEDICATED_NODE
+              value: "yes"
+            - name: ELASTICSEARCH_NODE_TYPE
+              value: "ingest"
+            - name: ES_JAVA_OPTS
+              value: "{{ .Values.esJavaOpts }}"
+            - name: XPACK_SECURITY_ENABLED
+              value: "false"
+          ports:
+            - name: {{ .Values.ingest.service.httpPortName }}
+              containerPort: {{ .Values.ingest.service.httpPort }}
+              protocol: TCP
+            - name: {{ .Values.ingest.service.transportPortName }}
+              containerPort: {{ .Values.ingest.service.transportPort }}
+              protocol: TCP
+          {{- if .Values.ingest.livenessProbe.enabled }}
+          livenessProbe:
+            initialDelaySeconds: {{ .Values.ingest.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.ingest.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.ingest.livenessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.ingest.livenessProbe.successThreshold }}
+            failureThreshold: {{ .Values.ingest.livenessProbe.failureThreshold }}
+            httpGet:
+              path: {{ .Values.ingest.livenessProbe.httpGet.path }}
+              port: {{ .Values.ingest.livenessProbe.httpGet.port }}
+              scheme: {{ .Values.ingest.livenessProbe.httpGet.scheme }}
+              httpHeaders:
+                - name: Authorization
+                  value: Basic ZWxhc3RpYzplbGFzdGlj
+          {{- end }}
+          {{- if .Values.ingest.readinessProbe.enabled }}
+          readinessProbe:
+            initialDelaySeconds: {{ .Values.ingest.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.ingest.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.ingest.readinessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.ingest.readinessProbe.successThreshold }}
+            failureThreshold: {{ .Values.ingest.readinessProbe.failureThreshold }}
+            httpGet:
+              path: {{ .Values.ingest.readinessProbe.httpGet.path }}
+              port: {{ .Values.ingest.readinessProbe.httpGet.port }}
+              scheme: {{ .Values.ingest.readinessProbe.httpGet.scheme }}
+              httpHeaders:
+                - name: Authorization
+                  value: Basic ZWxhc3RpYzplbGFzdGlj
+          {{- end }}
+{{- end }}

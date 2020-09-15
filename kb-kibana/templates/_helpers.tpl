@@ -45,12 +45,83 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 
 {{/*
-Create the name of the service account to use
+Create the name of persistent volume
 */}}
-{{- define "kb-kibana.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create -}}
-    {{ default (include "kb-kibana.fullname" .) .Values.serviceAccount.name }}
-{{- else -}}
-    {{ default "default" .Values.serviceAccount.name }}
+{{- define "persistentVolumeName" -}}
+{{- $persistent_volume_name := .Values.persistentVolume.name -}}
+{{- default .Release.Namespace -}}-{{- $persistent_volume_name -}}
 {{- end -}}
+
+{{/*
+Create the name of persistent volume claim
+*/}}
+{{- define "persistentVolumeClaimName" -}}
+{{- $persistent_volume_claim_name := .Values.persistentVolumeClaim.name -}}
+{{- default .Release.Namespace -}}-{{- $persistent_volume_claim_name -}}
+{{- end -}}
+
+{{/*
+Create the name of elasticsearch configmap
+*/}}
+{{- define "kibanaConfigMapName" -}}
+{{- $config_map_kibana := "kibana-configmap" -}}
+{{- default .Release.Namespace -}}-{{- $config_map_kibana -}}
+{{- end -}}
+
+{{/*
+Create the name of kibana service
+*/}}
+{{- define "kibanaServiceName" -}}
+{{- $kibana_service_name := .Values.service.name -}}
+{{- default .Release.Namespace -}}-{{- $kibana_service_name -}}
+{{- end -}}
+
+{{/*
+Create the name of kibana service account to use
+*/}}
+{{- define "kibanaServiceAccountName" -}}
+{{- if .Values.serviceAccount.create -}}
+{{- $kibana_service_account_name := .Values.serviceAccount.name -}}
+{{- default .Release.Namespace -}}-{{- $kibana_service_account_name -}}    
+{{- end -}}
+{{- end -}}
+
+{{/*
+Create the name of kibana credentials
+*/}}
+{{- define "kibanaCredentialsName" -}}
+{{- $kibana_credentials := .Values.secretName -}}
+{{- default .Release.Namespace -}}-{{- $kibana_credentials -}}
+{{- end -}}
+
+{{/*
+Create the name of kibana tls secret
+*/}}
+{{- define "kibanaTlsSecretName" -}}
+{{- $kibana_tls_secret := "kibana-tls-secret" -}}
+{{- default .Release.Namespace -}}-{{- $kibana_tls_secret -}}
+{{- end -}}
+
+{{/*
+Create the name of kibana ingress
+*/}}
+{{- define "kibanaIngressName" -}}
+{{- $kibana_ingress_name := .Values.ingress.name -}}
+{{- default .Release.Namespace -}}-{{- $kibana_ingress_name -}}
+{{- end -}}
+
+{{/*
+Create the name of kibana deployment
+*/}}
+{{- define "kibanaDeploymentName" -}}
+{{- $kibana_deployment_name := .Values.deployment.name -}}
+{{- default .Release.Namespace -}}-{{- $kibana_deployment_name -}}
+{{- end -}}
+
+{{/*
+Create url to elasticsearch deployment
+*/}}
+{{- define "elasticsearchUrl" -}}
+{{- $elasticsearch_service_name := "elasticsearch-master" -}}
+{{- default .Release.Namespace -}}-{{- $elasticsearch_service_name -}}
 {{- end -}}

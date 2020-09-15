@@ -1,0 +1,141 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "masterStatefulSetName" . }}
+spec:
+  serviceName: {{ include "masterServiceName" . }}
+  selector:
+    matchLabels:
+      app: {{ include "masterServiceName" . }}
+  replicas: {{ .Values.master.replicaCount }}
+  podManagementPolicy: {{ .Values.podManagementPolicy }}
+  updateStrategy:
+    type: {{ .Values.updateStrategy }}
+  {{- if not .Values.persistentVolumeClaim.created }}
+  volumeClaimTemplates:
+    - metadata:
+        name: {{ .Values.volumeClaimTemplates.name }}
+      spec:
+        accessModes: 
+          - {{ .Values.volumeClaimTemplates.accessModes }}
+        resources:
+          requests:
+            storage: {{ .Values.volumeClaimTemplates.resources.storage }}
+          {{- if .Values.persistentVolume.created }}
+          selector:
+            matchLabels:
+              volume: {{ include "persistentVolumeName" . }}
+          {{- end }}
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "masterStatefulSetName" . }}
+    spec:
+      volumes:
+        - name: elasticsearch-config
+          configMap:
+            name: {{ include "esConfigMapName" . }}
+        - name: readonlyrest-config
+          configMap:
+            name: {{ include "rorConfigMapName" . }}
+        - name: ror-keystore
+          configMap:
+            name: {{ include "rorKeystoreConfigMapName" . }}
+        {{- if .Values.persistentVolumeClaim.created }}
+        - name: {{ include "persistentVolumeName" . }}
+          persistentVolumeClaim:
+            claimName: {{ include "persistentVolumeClaimName" . }}
+        {{- end }}
+      containers:
+        - name: elasticsearch
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+          volumeMounts:
+            - name: elasticsearch-config
+              mountPath: /usr/share/elasticsearch/config/elasticsearch.yml
+              readOnly: true
+              subPath: elasticsearch.yml
+            - name: readonlyrest-config
+              mountPath: /usr/share/elasticsearch/config/readonlyrest.yml
+              readOnly: true
+              subPath: readonlyrest.yml
+            - name: ror-keystore
+              mountPath: /usr/share/elasticsearch/config/rorkeystore.jks
+              readOnly: true
+              subPath: rorkeystore.jks
+            - name: {{ include "persistentVolumeName" . }}
+              mountPath: {{ .Values.volumeMounts.pv.mountPath }}
+          {{- if .Values.master.resources }}
+          resources: {{- toYaml .Values.master.resources | nindent 12 }}
+          {{- end }}
+          securityContext: {{- toYaml .Values.master.securityContext | nindent 12 }}
+          env:
+            - name: node.master
+              value: "true"
+            - name: node.data
+              value: "false"
+            - name: node.ingest
+              value: "false"
+            - name: network.host
+              value: "{{ .Values.networkHost }}"
+            - name: cluster.name
+              value: "{{ .Values.clusterName }}"
+            - name: node.name
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: discovery.seed_hosts
+              value: "{{ template "kb-elastic.discoverySeedHosts" . }}"
+            - name: cluster.initial_master_nodes
+              value: "{{ template "kb-elastic.initialMasterNodes" . }}"
+            - name: node.max_local_storage_nodes
+              value: {{ add .Values.master.replicaCount .Values.data.replicaCount .Values.ingest.replicaCount | quote }}
+            - name: ELASTICSEARCH_HEAP_SIZE
+              value: {{ .Values.master.heapSize | quote }}
+            - name: ELASTICSEARCH_IS_DEDICATED_NODE
+              value: "yes"
+            - name: ELASTICSEARCH_NODE_TYPE
+              value: "master"
+            - name: ES_JAVA_OPTS
+              value: "{{ .Values.esJavaOpts }}"
+            - name: XPACK_SECURITY_ENABLED
+              value: "false"
+          ports:
+            - name: {{ .Values.master.service.httpPortName }}
+              containerPort: {{ .Values.master.service.httpPort }}
+              protocol: TCP
+            - name: {{ .Values.master.service.transportPortName }}
+              containerPort: {{ .Values.master.service.transportPort }}
+              protocol: TCP
+          {{- if .Values.master.livenessProbe.enabled }}
+          livenessProbe:
+            initialDelaySeconds: {{ .Values.master.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.master.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.master.livenessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.master.livenessProbe.successThreshold }}
+            failureThreshold: {{ .Values.master.livenessProbe.failureThreshold }}
+            httpGet:
+              path: {{ .Values.master.livenessProbe.httpGet.path }}
+              port: {{ .Values.master.livenessProbe.httpGet.port }}
+              scheme: {{ .Values.master.livenessProbe.httpGet.scheme }}
+              httpHeaders:
+                - name: Authorization
+                  value: Basic ZWxhc3RpYzplbGFzdGlj
+          {{- end }}
+          {{- if .Values.master.readinessProbe.enabled }}
+          readinessProbe:
+            initialDelaySeconds: {{ .Values.master.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.master.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.master.readinessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.master.readinessProbe.successThreshold }}
+            failureThreshold: {{ .Values.master.readinessProbe.failureThreshold }}
+            httpGet:
+              path: {{ .Values.master.readinessProbe.httpGet.path }}
+              port: {{ .Values.master.readinessProbe.httpGet.port }}
+              scheme: {{ .Values.master.readinessProbe.httpGet.scheme }}
+              httpHeaders:
+                - name: Authorization
+                  value: Basic ZWxhc3RpYzplbGFzdGlj
+          {{- end }}
